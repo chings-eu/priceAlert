@@ -10,11 +10,11 @@ time_current = datetime.datetime.now().time()
 day_current = datetime.datetime.now().weekday()
 
 # check all listed once as a text message
-def get_msg():
+def get_msg(send_all=False):
     msg = ''
     for symbol in symbols.keys():
         print(symbol)
-        current = get_current(symbol=symbol)
+        current = round(get_current(symbol=symbol), 2)
         print(current)
         last = get_last_day(symbol=symbol)
         print(last)
@@ -23,10 +23,15 @@ def get_msg():
         perc = (diff / last) * 100
         perc = round(perc, 2)
         print(f'{perc} %')
-        if abs(perc) >= symbols[symbol]:
-            msg += f'{symbol} price changes: {perc} %\n'
+        if send_all: # send all
+            msg += f'{symbol} price ${current} changes: {perc} %\n'
+        elif abs(perc) >= symbols[symbol]: # send only over threshold
+            msg += f'{symbol} price ${current} changes: {perc} %\n'
     return msg
 
+# since the task in pythonanywhere runs hourly, 
+# for running more than once/hour, 
+# this script should wait
 import time
 period = 60 * 60 # houly task
 rounds = 10 # every (period / rounds) minutes
@@ -34,12 +39,23 @@ count = 0
 
 # use a loop for the times
 # check if it's from Mon. to Fri. and from UTC 13:30 - 20:00
+# time nyse (north america) = utc-5
+import time, pytz
+time.utcnow()
+local_time = time.localtime()
+time_open = datetime.time(9, 30)
+time_close = datetime.time(16, 0)
 if day_current < 5 and datetime.time(13, 30) <= time_current <= datetime.time(22, 0):
     loop = asyncio.get_event_loop()
     while count < rounds:
         msg = ''
         try:
-            msg = get_msg()
+            # in the first hour, send all price
+            if datetime.time(13, 30) <= time_current <= datetime.time(14, 15):
+                msg = get_msg(True)
+            # after first hour, only check when over the threshold
+            else:
+                msg = get_msg()
             if msg == '':
                 print('no message gathered')
             else:
